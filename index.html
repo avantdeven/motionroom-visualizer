@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#08080a">
+  <title>Motionroom — Beat Visualizer Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#" aria-label="Motionroom home">
+      <span class="brand-mark"><i></i><i></i><i></i></span>
+      <span>MOTIONROOM</span>
+    </a>
+    <span class="project-state"><span></span> PROJECT / UNTITLED 001</span>
+    <button class="icon-button" id="helpButton" aria-label="Show keyboard shortcuts">?</button>
+  </header>
+
+  <main class="studio-shell">
+    <aside class="control-panel" aria-label="Visualizer controls">
+      <div class="panel-heading">
+        <p class="eyebrow">ART DIRECTION</p>
+        <p class="step-count">01—06</p>
+      </div>
+
+      <section class="control-section first">
+        <div class="section-title"><span>01</span><h2>AUDIO</h2></div>
+        <label class="dropzone" id="audioDropzone" for="audioInput">
+          <input id="audioInput" type="file" accept="audio/*" hidden>
+          <span class="drop-icon">↳</span>
+          <span class="drop-copy"><strong>DROP YOUR BEAT</strong><small>MP3, WAV, M4A · UP TO 100MB</small></span>
+          <span class="browse">BROWSE</span>
+        </label>
+        <div class="track-chip hidden" id="trackChip">
+          <span class="track-bars">▥</span><span><strong id="trackName">track.mp3</strong><small id="trackMeta">READY</small></span>
+          <button id="removeTrack" aria-label="Remove audio">×</button>
+        </div>
+      </section>
+
+      <section class="control-section">
+        <div class="section-title"><span>02</span><h2>PALETTE</h2><button class="text-button" id="randomizePalette">RANDOMIZE</button></div>
+        <div class="palette-row" id="paletteRow">
+          <label><input type="color" value="#15f5d1" data-color="0"><span>#15F5D1</span></label>
+          <label><input type="color" value="#ff2f92" data-color="1"><span>#FF2F92</span></label>
+          <label><input type="color" value="#695cff" data-color="2"><span>#695CFF</span></label>
+        </div>
+      </section>
+
+      <section class="control-section">
+        <div class="section-title"><span>03</span><h2>REFERENCE</h2></div>
+        <label class="reference-drop" id="referenceDropzone" for="referenceInput">
+          <input id="referenceInput" type="file" accept="image/*" multiple hidden>
+          <span>＋</span><strong>ADD VISUAL REFERENCES</strong><small>Images influence color + texture</small>
+        </label>
+        <div class="reference-list" id="referenceList"></div>
+        <label class="range-label"><span>REFERENCE INFLUENCE</span><output id="influenceValue">45%</output></label>
+        <input class="range" id="influence" type="range" min="0" max="100" value="45">
+      </section>
+
+      <section class="control-section">
+        <div class="section-title"><span>04</span><h2>ELEMENTS</h2></div>
+        <div class="toggle-grid">
+          <label class="toggle"><input type="checkbox" data-element="particles" checked><span>PARTICLES</span></label>
+          <label class="toggle"><input type="checkbox" data-element="rings" checked><span>ORBIT RINGS</span></label>
+          <label class="toggle"><input type="checkbox" data-element="grid" checked><span>GRID</span></label>
+          <label class="toggle"><input type="checkbox" data-element="grain" checked><span>FILM GRAIN</span></label>
+          <label class="toggle"><input type="checkbox" data-element="pulse" checked><span>CENTER PULSE</span></label>
+          <label class="toggle locked"><input type="checkbox" checked disabled><span>CORE WAVE</span><em>ON</em></label>
+        </div>
+        <label class="range-label"><span>MOTION</span><output id="motionValue">68%</output></label>
+        <input class="range" id="motion" type="range" min="10" max="100" value="68">
+
+        <div class="sub-control wave-control">
+          <label class="field-label" for="waveStyle">WAVEFORM STYLE</label>
+          <select class="select-input" id="waveStyle">
+            <option value="smooth">AURA / SMOOTH</option>
+            <option value="bars">RADIAL BARS</option>
+            <option value="ribbon">PLASMA RIBBON</option>
+            <option value="dots">ORBIT DOTS</option>
+            <option value="glitch">GLITCH TRACE</option>
+          </select>
+        </div>
+        <label class="range-label"><span>WAVE DISTANCE</span><output id="waveRadiusValue">68%</output></label>
+        <input class="range" id="waveRadius" type="range" min="35" max="100" value="68">
+        <label class="range-label"><span>WAVE WEIGHT</span><output id="waveWeightValue">45%</output></label>
+        <input class="range" id="waveWeight" type="range" min="10" max="100" value="45">
+
+        <div class="sub-control">
+          <label class="field-label" for="figureShape">CORE FIGURE</label>
+          <select class="select-input" id="figureShape">
+            <option value="portal">NEON PORTAL</option>
+            <option value="diamond">PRISM DIAMOND</option>
+            <option value="monolith">MONOLITH</option>
+            <option value="orb">PLASMA ORB</option>
+            <option value="spire">CYBER SPIRE</option>
+          </select>
+        </div>
+        <label class="range-label"><span>FIGURE SCALE</span><output id="figureScaleValue">52%</output></label>
+        <input class="range" id="figureScale" type="range" min="20" max="90" value="52">
+        <label class="range-label"><span>GEOMETRY WARP</span><output id="warpValue">38%</output></label>
+        <input class="range" id="warp" type="range" min="0" max="100" value="38">
+      </section>
+
+      <section class="control-section">
+        <div class="section-title"><span>05</span><h2>LIGHT ENGINE</h2></div>
+        <label class="field-label" for="lightingMode">LIGHTING MODE</label>
+        <select class="select-input" id="lightingMode">
+          <option value="laser">LASER VEIL</option>
+          <option value="volumetric">VOLUMETRIC RAYS</option>
+          <option value="strobe">BASS STROBE</option>
+          <option value="halo">CHROMA HALO</option>
+          <option value="noir">NEON NOIR</option>
+        </select>
+        <label class="range-label"><span>LIGHT INTENSITY</span><output id="lightValue">72%</output></label>
+        <input class="range" id="lightIntensity" type="range" min="0" max="100" value="72">
+        <label class="range-label"><span>BLOOM</span><output id="bloomValue">64%</output></label>
+        <input class="range" id="bloom" type="range" min="0" max="100" value="64">
+        <label class="range-label"><span>BEAM ANGLE</span><output id="beamValue">28°</output></label>
+        <input class="range" id="beamAngle" type="range" min="-90" max="90" value="28">
+      </section>
+
+      <section class="control-section">
+        <div class="section-title"><span>06</span><h2>TYPE</h2></div>
+        <label class="field-label" for="titleInput">TITLE</label>
+        <input class="text-input" id="titleInput" value="NIGHT SHIFT" maxlength="28">
+        <label class="field-label" for="subtitleInput">ARTIST / CAPTION</label>
+        <input class="text-input" id="subtitleInput" value="A NEW FREQUENCY" maxlength="40">
+        <label class="field-label" for="fontSelect">DISPLAY FONT</label>
+        <select class="select-input" id="fontSelect">
+          <option value="Manrope">MANROPE / MODERN</option>
+          <option value="DM Mono">DM MONO / TECH</option>
+          <option value="Impact">IMPACT / HEAVY</option>
+          <option value="Arial Black">ARIAL BLACK / WIDE</option>
+          <option value="Georgia">GEORGIA / EDITORIAL</option>
+          <option value="Times New Roman">TIMES / CLASSIC</option>
+          <option value="Courier New">COURIER / TERMINAL</option>
+          <option value="custom">CUSTOM UPLOAD…</option>
+        </select>
+        <label class="font-upload hidden" id="fontUploadLabel" for="fontInput">
+          <input id="fontInput" type="file" accept=".ttf,.otf,.woff,.woff2,font/*" multiple hidden>
+          <span>＋</span><strong>DROP ANY FONT FILE</strong><small>TTF, OTF, WOFF, WOFF2</small>
+        </label>
+        <label class="field-label" for="fontFamilyInput">ANY INSTALLED FONT</label>
+        <div class="inline-field"><input class="text-input" id="fontFamilyInput" placeholder="Type exact font family"><button id="applyFontFamily">USE</button></div>
+        <div class="font-options">
+          <label><span>WEIGHT</span><select class="select-input" id="fontWeight"><option value="400">REGULAR</option><option value="600" selected>SEMIBOLD</option><option value="800">HEAVY</option></select></label>
+          <label><span>ALIGNMENT</span><select class="select-input" id="textAlign"><option value="center">CENTER</option><option value="left">LEFT</option><option value="right">RIGHT</option></select></label>
+        </div>
+        <label class="range-label"><span>LETTER SPACING</span><output id="trackingValue">30%</output></label>
+        <input class="range" id="tracking" type="range" min="0" max="100" value="30">
+
+        <div class="word-editor">
+          <div class="section-title"><span>↳</span><h2>WORD CONTROL</h2></div>
+          <div class="word-tabs" id="wordTabs" aria-label="Choose word to edit"></div>
+          <label class="field-label" for="wordFont">WORD FONT</label>
+          <select class="select-input" id="wordFont"></select>
+          <div class="font-options">
+            <label><span>WORD COLOR</span><input class="word-color" id="wordColor" type="color" value="#ecfaff"></label>
+            <label><span>WORD WEIGHT</span><select class="select-input" id="wordWeight"><option value="300">LIGHT</option><option value="400">REGULAR</option><option value="600" selected>SEMIBOLD</option><option value="800">HEAVY</option><option value="900">BLACK</option></select></label>
+          </div>
+          <label class="range-label"><span>WORD SIZE</span><output id="wordSizeValue">100%</output></label>
+          <input class="range" id="wordSize" type="range" min="30" max="220" value="100">
+          <label class="range-label"><span>HORIZONTAL POSITION</span><output id="wordXValue">0</output></label>
+          <input class="range" id="wordX" type="range" min="-50" max="50" value="0">
+          <label class="range-label"><span>VERTICAL POSITION</span><output id="wordYValue">0</output></label>
+          <input class="range" id="wordY" type="range" min="-50" max="50" value="0">
+          <label class="range-label"><span>WORD ROTATION</span><output id="wordRotateValue">0°</output></label>
+          <input class="range" id="wordRotate" type="range" min="-180" max="180" value="0">
+          <label class="range-label"><span>WORD TRACKING</span><output id="wordTrackingValue">30%</output></label>
+          <input class="range" id="wordTracking" type="range" min="0" max="100" value="30">
+        </div>
+      </section>
+    </aside>
+
+    <section class="preview-area">
+      <div class="preview-topline">
+        <div><span class="live-dot"></span> LIVE PREVIEW</div>
+        <div class="format-switch" role="group" aria-label="Canvas format">
+          <button class="active" data-ratio="16:9">16:9</button><button data-ratio="1:1">1:1</button><button data-ratio="9:16">9:16</button>
+        </div>
+        <div id="resolutionLabel">1920 × 1080</div>
+      </div>
+
+      <div class="canvas-stage" id="canvasStage">
+        <canvas id="visualizerCanvas" width="1280" height="720" aria-label="Audio-reactive visualizer preview"></canvas>
+        <div class="drop-overlay" id="dropOverlay"><span>DROP BEAT OR REFERENCES</span></div>
+      </div>
+
+      <div class="transport">
+        <button class="play-button" id="playButton" aria-label="Play audio">▶</button>
+        <span class="time" id="currentTime">00:00</span>
+        <input class="timeline" id="timeline" type="range" min="0" max="1000" value="0" aria-label="Track position">
+        <span class="time" id="duration">00:00</span>
+        <button class="sound-button" id="muteButton" aria-label="Mute audio">◖</button>
+      </div>
+
+      <div class="action-row">
+        <p><span></span> Audio-reactive engine ready</p>
+        <button class="secondary-button" id="shuffleLook">SHUFFLE LOOK</button>
+        <button class="secondary-button" id="snapshotButton">DOWNLOAD PNG</button>
+        <label class="export-length" for="exportLength"><span>VIDEO LENGTH</span><select id="exportLength">
+          <option value="full">FULL TRACK</option><option value="15">15 SEC</option><option value="30">30 SEC</option><option value="60">60 SEC</option>
+        </select></label>
+        <button class="primary-button" id="exportButton"><span>↓</span> EXPORT 1080P MP4</button>
+      </div>
+      <p class="export-note" id="exportNote">Hardware-rendered 1080p export runs faster than playback.</p>
+    </section>
+  </main>
+
+  <dialog id="helpDialog">
+    <button id="closeHelp" aria-label="Close">×</button>
+    <p class="eyebrow">SHORTCUTS</p><h2>MOVE FAST</h2>
+    <dl><div><dt>SPACE</dt><dd>Play / pause</dd></div><div><dt>R</dt><dd>Randomize palette</dd></div><div><dt>S</dt><dd>Shuffle composition</dd></div></dl>
+  </dialog>
+
+  <audio id="audio" crossorigin="anonymous"></audio>
+  <script src="app.js"></script>
+</body>
+</html>
