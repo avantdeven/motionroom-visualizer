@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=memory3">
+  <link rel="stylesheet" href="styles.css?v=references6">
 </head>
 <body>
   <header class="topbar">
@@ -63,14 +63,23 @@
       </section>
 
       <section class="control-section">
-        <div class="section-title"><span>03</span><h2>REFERENCE</h2></div>
+        <div class="section-title"><span>03</span><h2>REFERENCE</h2><button class="text-button" id="clearReferences">REMOVE ALL</button></div>
         <label class="reference-drop" id="referenceDropzone" for="referenceInput">
           <input id="referenceInput" type="file" accept="image/*" multiple hidden>
-          <span>＋</span><strong>ADD VISUAL REFERENCES</strong><small>Images influence color + texture</small>
+          <span>＋</span><strong>ADD VISUAL REFERENCES</strong><small>Images can direct type, color, wave + core</small>
         </label>
         <div class="reference-list" id="referenceList"></div>
+        <label class="field-label">INFLUENCE TARGETS</label>
+        <div class="toggle-grid reference-targets">
+          <label class="toggle"><input type="checkbox" data-reference-affect="texture" checked><span>TEXTURE</span></label>
+          <label class="toggle"><input type="checkbox" data-reference-affect="color" checked><span>COLORS</span></label>
+          <label class="toggle"><input type="checkbox" data-reference-affect="font" checked><span>FONT</span></label>
+          <label class="toggle"><input type="checkbox" data-reference-affect="wave" checked><span>WAVEFORM</span></label>
+          <label class="toggle"><input type="checkbox" data-reference-affect="core" checked><span>CORE FIGURE</span></label>
+        </div>
         <label class="range-label"><span>REFERENCE INFLUENCE</span><output id="influenceValue">45%</output></label>
         <input class="range" id="influence" type="range" min="0" max="100" value="45">
+        <button class="secondary-button reference-apply" id="applyReference">RE-APPLY INFLUENCE</button>
       </section>
 
       <section class="control-section">
@@ -260,6 +269,6 @@
   </dialog>
 
   <audio id="audio" crossorigin="anonymous"></audio>
-  <script src="app.js?v=audio-clock5"></script>
+  <script src="app.js?v=references6"></script>
 </body>
 </html>
