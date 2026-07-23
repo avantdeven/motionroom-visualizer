@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=memory3">
 </head>
 <body>
   <header class="topbar">
@@ -27,7 +27,19 @@
         <p class="step-count">01—06</p>
       </div>
 
-      <section class="control-section first">
+      <section class="control-section first project-section">
+        <div class="section-title"><span>↺</span><h2>PROJECT MEMORY</h2><span class="save-state" id="saveState">AUTO-SAVED</span></div>
+        <label class="field-label" for="presetName">SAVE PARAMETER PRESET</label>
+        <div class="inline-field"><input class="text-input" id="presetName" maxlength="32" placeholder="Preset name"><button id="savePreset">SAVE</button></div>
+        <label class="field-label" for="presetSelect">SAVED PRESETS</label>
+        <select class="select-input" id="presetSelect"><option value="">NO PRESETS YET</option></select>
+        <div class="preset-actions">
+          <button class="secondary-button" id="loadPreset">LOAD PRESET</button>
+          <button class="secondary-button danger-button" id="deletePreset">DELETE</button>
+        </div>
+      </section>
+
+      <section class="control-section">
         <div class="section-title"><span>01</span><h2>AUDIO</h2></div>
         <label class="dropzone" id="audioDropzone" for="audioInput">
           <input id="audioInput" type="file" accept="audio/*" hidden>
@@ -245,6 +257,6 @@
   </dialog>
 
   <audio id="audio" crossorigin="anonymous"></audio>
-  <script src="app.js?v=aa19abc"></script>
+  <script src="app.js?v=memory3"></script>
 </body>
 </html>
