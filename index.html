@@ -244,6 +244,9 @@
         <label class="export-length" for="exportLength"><span>VIDEO LENGTH</span><select id="exportLength">
           <option value="full">FULL TRACK</option><option value="15">15 SEC</option><option value="30">30 SEC</option><option value="60">60 SEC</option>
         </select></label>
+        <label class="export-length" for="exportFps"><span>FRAME RATE</span><select id="exportFps">
+          <option value="30" selected>30 FPS / COMPATIBLE</option><option value="60">60 FPS / HIGH MOTION</option>
+        </select></label>
         <button class="primary-button" id="exportButton"><span>↓</span> EXPORT 1080P MP4</button>
       </div>
       <p class="export-note" id="exportNote">Hardware-rendered 1080p export runs faster than playback.</p>
@@ -257,6 +260,6 @@
   </dialog>
 
   <audio id="audio" crossorigin="anonymous"></audio>
-  <script src="app.js?v=memory3"></script>
+  <script src="app.js?v=playback4"></script>
 </body>
 </html>
