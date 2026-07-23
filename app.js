@@ -8,6 +8,7 @@ const palette = ['#15f5d1', '#ff2f92', '#695cff'];
 const availableFonts = ['Manrope','DM Mono','Impact','Arial Black','Georgia','Times New Roman','Courier New','Helvetica','Futura','Avenir','Garamond','Baskerville'];
 const state = {
   playing: false, reference: null, customFigure: null, influence: .45, motion: .68, seed: 12,
+  referenceAffects: { texture: true, color: true, font: true, wave: true, core: true },
   elements: { particles: true, rings: true, grid: true, grain: true, pulse: true },
   title: 'NIGHT SHIFT', subtitle: 'A NEW FREQUENCY', ratio: '16:9',
   figure: 'portal', figureScale: .52, warp: .38,
@@ -24,7 +25,7 @@ let bassFloor = .08, beatPulse = 0, lastBeatAt = 0, transientFloor = .025, trans
 let previousSpectrum = new Uint8Array(256);
 let wordStyles = [], selectedWord = 0;
 let offlineRendering = false;
-let autosaveTimer = null, restoringProject = false, referenceFiles = [], coreImageFile = null, uploadedFontFiles = [];
+let autosaveTimer = null, restoringProject = false, referenceFiles = [], referenceItems = [], coreImageFile = null, uploadedFontFiles = [];
 const PROJECT_KEY = 'motionroom:last-project:v2', PRESET_KEY = 'motionroom:presets:v1', DB_NAME = 'motionroom-projects';
 const particles = Array.from({length: 90}, (_, i) => ({
   x: seeded(i * 3.7), y: seeded(i * 7.9), z: .2 + seeded(i * 11.2) * .8, s: .5 + seeded(i * 4.3) * 2
@@ -55,14 +56,14 @@ function syncProjectUI(){
   $('#titleInput').value=state.title;$('#subtitleInput').value=state.subtitle;$('#figureShape').value=state.figure;$('#lightingMode').value=state.lighting;$('#fontSelect').value=[...$('#fontSelect').options].some(o=>o.value===state.font)?state.font:'Manrope';$('#fontWeight').value=String(state.fontWeight);$('#textAlign').value=state.textAlign;$('#waveStyle').value=state.waveStyle;$('#neonColor').value=state.neonColor;$('#neonMode').value=state.neonMode;
   const ranges=[['influence',state.influence*100,'influenceValue'],['motion',state.motion*100,'motionValue'],['waveRadius',state.waveRadius*100,'waveRadiusValue'],['waveWeight',state.waveWeight*100,'waveWeightValue'],['figureScale',state.figureScale*100,'figureScaleValue'],['warp',state.warp*100,'warpValue'],['transientPunch',state.transientPunch*100,'transientPunchValue'],['lightIntensity',state.lightIntensity*100,'lightValue'],['bloom',state.bloom*100,'bloomValue'],['tracking',state.tracking*100,'trackingValue'],['neonIntensity',state.neonIntensity*100,'neonIntensityValue'],['neonSpread',state.neonSpread*100,'neonSpreadValue']];
   ranges.forEach(([id,value,out])=>{const el=$('#'+id),rounded=Math.round(value);el.value=rounded;$('#'+out).textContent=rounded+'%';updateRange(el)});$('#beamAngle').value=state.beamAngle;$('#beamValue').textContent=state.beamAngle+'°';updateRange($('#beamAngle'));
-  $$('[data-element]').forEach(el=>el.checked=state.elements[el.dataset.element]!==false);syncWords();
+  $$('[data-element]').forEach(el=>el.checked=state.elements[el.dataset.element]!==false);$$('[data-reference-affect]').forEach(el=>el.checked=state.referenceAffects?.[el.dataset.referenceAffect]!==false);syncWords();
 }
 function loadSavedProject(){
   try{const saved=JSON.parse(localStorage.getItem(PROJECT_KEY));if(!saved?.state)return;restoringProject=true;Object.assign(state,saved.state,{playing:false,reference:null,customFigure:null});if(saved.palette?.length===3)saved.palette.forEach((color,i)=>setPalette(i,color));wordStyles=Array.isArray(saved.wordStyles)?saved.wordStyles.map(style=>({...defaultWordStyle(),...style})):[];syncProjectUI();$('#saveState').textContent='PROJECT RESTORED'}catch{$('#saveState').textContent='NEW PROJECT'}finally{restoringProject=false}
 }
 async function restoreProjectAssets(){
   const [savedAudio,savedReferences,savedCore,savedFonts]=await Promise.all([readAsset('audio'),readAsset('references'),readAsset('core'),readAsset('fonts')]);
-  if(savedAudio)loadAudio(savedAudio,false);if(Array.isArray(savedReferences)){referenceFiles=[...savedReferences];savedReferences.forEach(file=>loadReference(file,false))}if(savedCore)loadCoreImage(savedCore,false,false);if(Array.isArray(savedFonts)){uploadedFontFiles=[...savedFonts];await loadFontFiles(savedFonts,false);if(availableFonts.includes(state.font)){$('#fontSelect').value=state.font;populateWordFonts()}}
+  if(savedAudio)loadAudio(savedAudio,false);if(Array.isArray(savedReferences)){referenceFiles=[...savedReferences];savedReferences.forEach(file=>loadReference(file,false,false))}if(savedCore)loadCoreImage(savedCore,false,false);if(Array.isArray(savedFonts)){uploadedFontFiles=[...savedFonts];await loadFontFiles(savedFonts,false);if(availableFonts.includes(state.font)){$('#fontSelect').value=state.font;populateWordFonts()}}
 }
 function getPresets(){try{return JSON.parse(localStorage.getItem(PRESET_KEY))||[]}catch{return[]}}
 function refreshPresets(selected=''){const presets=getPresets(),select=$('#presetSelect');select.innerHTML='';if(!presets.length){select.add(new Option('NO PRESETS YET',''));return}presets.forEach(preset=>select.add(new Option(preset.name,preset.id)));select.value=selected||presets[0].id}
@@ -91,14 +92,28 @@ function loadAudio(file,persist=true) {
   if(persist)storeAsset('audio',file);scheduleAutosave();
 }
 
-function loadReference(file,persist=true) {
+function loadReference(file,persist=true,apply=true) {
   if (!file?.type.startsWith('image/')) return;
   const url = URL.createObjectURL(file); const img = new Image();
-  img.onload = () => { state.reference = img; extractPalette(img); };
+  const id=`ref-${Date.now()}-${Math.random().toString(36).slice(2,7)}`;
+  img.onload = () => {
+    referenceItems.push({id,file,img,url});
+    if(referenceItems.length>4){const removed=referenceItems.shift();URL.revokeObjectURL(removed.url)}
+    referenceFiles=referenceItems.map(item=>item.file);state.reference=img;renderReferenceList();if(apply)applyReferenceInfluence(img);
+    if(persist)storeAsset('references',referenceFiles);scheduleAutosave();
+  };
   img.src = url;
-  const thumb = document.createElement('img'); thumb.src = url; thumb.className = 'reference-thumb'; thumb.alt = file.name;
-  const list = $('#referenceList'); if (list.children.length >= 4) list.firstElementChild.remove(); list.append(thumb);
-  if(persist){referenceFiles.push(file);referenceFiles=referenceFiles.slice(-4);storeAsset('references',referenceFiles)}scheduleAutosave();
+}
+
+function renderReferenceList(){
+  const list=$('#referenceList');list.innerHTML='';
+  referenceItems.forEach(item=>{const wrap=document.createElement('div');wrap.className='reference-item';const thumb=document.createElement('img');thumb.src=item.url;thumb.className='reference-thumb';thumb.alt=item.file.name;const remove=document.createElement('button');remove.type='button';remove.className='reference-remove';remove.textContent='×';remove.setAttribute('aria-label',`Remove ${item.file.name}`);remove.addEventListener('click',()=>removeReference(item.id));wrap.append(thumb,remove);list.append(wrap)});
+}
+function removeReference(id){
+  const removed=referenceItems.find(item=>item.id===id);if(removed)URL.revokeObjectURL(removed.url);referenceItems=referenceItems.filter(item=>item.id!==id);referenceFiles=referenceItems.map(item=>item.file);state.reference=referenceItems.at(-1)?.img||null;renderReferenceList();storeAsset('references',referenceFiles);scheduleAutosave();$('#exportNote').textContent=referenceItems.length?'Reference removed. Remaining influences stay editable.':'All reference influence removed.';
+}
+function clearReferences(){
+  referenceItems.forEach(item=>URL.revokeObjectURL(item.url));referenceItems=[];referenceFiles=[];state.reference=null;renderReferenceList();storeAsset('references',[]);scheduleAutosave();$('#exportNote').textContent='All reference images and texture influence removed.';
 }
 
 function loadCoreImage(file,persist=true,activate=true){
@@ -111,12 +126,22 @@ function loadCoreImage(file,persist=true,activate=true){
 
 async function loadFontFiles(files,persist=true){let lastFont='';for(const file of files){try{const family=file.name.replace(/\.[^.]+$/,'').replace(/[^a-zA-Z0-9 _-]/g,'').trim()||('UserFont'+Date.now());const face=new FontFace(family,`url(${URL.createObjectURL(file)})`);await face.load();document.fonts.add(face);addAvailableFont(family);lastFont=family}catch{$('#exportNote').textContent=`${file.name} could not be loaded.`;$('#exportNote').classList.add('error')}}if(persist){uploadedFontFiles=[...files];storeAsset('fonts',uploadedFontFiles)}return lastFont}
 
-function extractPalette(img) {
+function analyzeReference(img) {
   const c = document.createElement('canvas'); c.width = c.height = 24; const x = c.getContext('2d');
   x.drawImage(img,0,0,24,24); const d = x.getImageData(0,0,24,24).data;
-  const samples = [[0,0,0,0],[0,0,0,0],[0,0,0,0]];
-  for(let i=0;i<d.length;i+=16){ const lum=(d[i]+d[i+1]+d[i+2])/3; const b=lum<85?0:lum<170?1:2; samples[b][0]+=d[i];samples[b][1]+=d[i+1];samples[b][2]+=d[i+2];samples[b][3]++; }
-  samples.forEach((s,i)=>{ if(!s[3])return; const v='#'+s.slice(0,3).map(n=>Math.round(n/s[3]).toString(16).padStart(2,'0')).join(''); setPalette(i,v); });
+  const samples=[[0,0,0,0],[0,0,0,0],[0,0,0,0]];let lumSum=0,lumSq=0,satSum=0,edges=0,count=0;
+  for(let p=0;p<d.length;p+=4){const r=d[p],g=d[p+1],b=d[p+2],max=Math.max(r,g,b),min=Math.min(r,g,b),lum=(r+g+b)/3,band=lum<85?0:lum<170?1:2;samples[band][0]+=r;samples[band][1]+=g;samples[band][2]+=b;samples[band][3]++;lumSum+=lum;lumSq+=lum*lum;satSum+=max?((max-min)/max):0;if(p>=96)edges+=Math.abs(lum-((d[p-96]+d[p-95]+d[p-94])/3));count++}
+  const colors=samples.map((s,i)=>s[3]?'#'+s.slice(0,3).map(n=>Math.round(n/s[3]).toString(16).padStart(2,'0')).join(''):palette[i]),mean=lumSum/count;
+  return{colors,saturation:satSum/count,contrast:Math.min(1,Math.sqrt(Math.max(0,lumSq/count-mean*mean))/82),edges:Math.min(1,edges/count/65),brightness:mean/255};
+}
+function blendHex(a,b,mix){const aa=hexToRgb(a),bb=hexToRgb(b);return'#'+aa.map((v,i)=>Math.round(v+(bb[i]-v)*mix).toString(16).padStart(2,'0')).join('')}
+function applyReferenceInfluence(img=state.reference){
+  if(!img)return;const analysis=analyzeReference(img),mix=Math.max(0,Math.min(1,state.influence)),affects=state.referenceAffects;
+  if(affects.color)analysis.colors.forEach((color,i)=>setPalette(i,blendHex(palette[i],color,mix)));
+  if(affects.font){const font=analysis.edges>.62?'DM Mono':analysis.contrast>.58?'Impact':analysis.brightness>.62?'Georgia':'Manrope';state.font=font;addAvailableFont(font);wordStyles.forEach(style=>style.font=font);$('#fontSelect').value=font;syncWordControls()}
+  if(affects.wave){const waves=['smooth','ribbon','dots','crown','helix','petals','shards','electric','tunnel'],index=Math.min(waves.length-1,Math.floor((analysis.edges*.46+analysis.saturation*.34+analysis.contrast*.2)*waves.length));state.waveStyle=waves[index];$('#waveStyle').value=state.waveStyle}
+  if(affects.core){const figures=['portal','orb','diamond','hex','eye','star','spire','cross','monolith'],index=Math.min(figures.length-1,Math.floor((analysis.contrast*.45+analysis.edges*.35+(1-analysis.brightness)*.2)*figures.length));state.figure=figures[index];$('#figureShape').value=state.figure}
+  scheduleAutosave();$('#exportNote').textContent='Reference influence applied. Every generated choice remains manually editable.';
 }
 function setPalette(i, color) { palette[i]=color; const el=$(`[data-color="${i}"]`); el.value=color; el.nextElementSibling.textContent=color.toUpperCase(); document.documentElement.style.setProperty(['--acid','--pink','--violet'][i],color); }
 
@@ -209,7 +234,7 @@ function draw(t,manual=false,snapshot=null) {
   if(offlineRendering&&!manual){requestAnimationFrame(draw);return}
   const w=canvas.width,h=canvas.height,cx=w/2,cy=h/2; const {bass,mid,beat,transient=beat}=snapshot||getAudioData(t); const energy=Math.min(1,bass*1.7+mid*.35);
   ctx.fillStyle='#070709';ctx.fillRect(0,0,w,h);
-  if(state.reference){ctx.save();ctx.globalAlpha=state.influence*.3;ctx.filter=`blur(${8+state.influence*16}px) saturate(1.5) contrast(1.1)`;const scale=Math.max(w/state.reference.width,h/state.reference.height);const iw=state.reference.width*scale,ih=state.reference.height*scale;ctx.drawImage(state.reference,(w-iw)/2,(h-ih)/2,iw,ih);ctx.restore();}
+  if(state.reference&&state.referenceAffects.texture){ctx.save();ctx.globalAlpha=state.influence*.3;ctx.filter=`blur(${8+state.influence*16}px) saturate(1.5) contrast(1.1)`;const scale=Math.max(w/state.reference.width,h/state.reference.height);const iw=state.reference.width*scale,ih=state.reference.height*scale;ctx.drawImage(state.reference,(w-iw)/2,(h-ih)/2,iw,ih);ctx.restore();}
   const grad=ctx.createRadialGradient(cx,cy,0,cx,cy,w*.6);grad.addColorStop(0,rgba(palette[2],.18+energy*.12));grad.addColorStop(.4,rgba(palette[1],.07));grad.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=grad;ctx.fillRect(0,0,w,h);
   if(state.elements.grid){ctx.save();ctx.strokeStyle=rgba(palette[2],.14);ctx.lineWidth=1;const gap=Math.max(36,w/24),off=(t*.018*state.motion)%gap;for(let x=-gap+off;x<w;x+=gap){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,h);ctx.stroke()}for(let y=-gap+off;y<h;y+=gap){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(w,y);ctx.stroke()}ctx.restore();}
   drawLighting(w,h,cx,cy,energy,t);
@@ -230,6 +255,8 @@ function updateRange(el){const p=(el.value-el.min)/(el.max-el.min)*100;el.style.
 
 $('#audioInput').addEventListener('change',e=>loadAudio(e.target.files[0]));
 $('#referenceInput').addEventListener('change',e=>[...e.target.files].forEach(loadReference));
+$('#clearReferences').addEventListener('click',clearReferences);$('#applyReference').addEventListener('click',()=>applyReferenceInfluence());
+$$('[data-reference-affect]').forEach(el=>el.addEventListener('change',e=>{state.referenceAffects[e.target.dataset.referenceAffect]=e.target.checked;scheduleAutosave()}));
 $('#coreImageInput').addEventListener('change',e=>loadCoreImage(e.target.files[0]));
 $('#savePreset').addEventListener('click',saveNamedPreset);$('#loadPreset').addEventListener('click',loadNamedPreset);$('#deletePreset').addEventListener('click',deleteNamedPreset);
 $('#removeTrack').addEventListener('click',()=>{audio.pause();audio.removeAttribute('src');loadedAudioFile=null;storeAsset('audio',null);$('#audioDropzone').classList.remove('hidden');$('#trackChip').classList.add('hidden');scheduleAutosave()});
