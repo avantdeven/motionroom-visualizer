@@ -24,6 +24,8 @@ let bassFloor = .08, beatPulse = 0, lastBeatAt = 0, transientFloor = .025, trans
 let previousSpectrum = new Uint8Array(256);
 let wordStyles = [], selectedWord = 0;
 let offlineRendering = false;
+let autosaveTimer = null, restoringProject = false, referenceFiles = [], coreImageFile = null, uploadedFontFiles = [];
+const PROJECT_KEY = 'motionroom:last-project:v2', PRESET_KEY = 'motionroom:presets:v1', DB_NAME = 'motionroom-projects';
 const particles = Array.from({length: 90}, (_, i) => ({
   x: seeded(i * 3.7), y: seeded(i * 7.9), z: .2 + seeded(i * 11.2) * .8, s: .5 + seeded(i * 4.3) * 2
 }));
@@ -39,6 +41,35 @@ function renderWordTabs(){const tabs=$('#wordTabs');if(!tabs)return;tabs.innerHT
 function syncWordControls(){const s=wordStyles[selectedWord];if(!s)return;if(s.neon==null)s.neon=1;populateWordFonts();$('#wordFont').value=s.font;$('#wordColor').value=s.color;$('#wordWeight').value=String(s.weight);const values=[['wordSize',s.size*100,'wordSizeValue',Math.round(s.size*100)+'%'],['wordX',s.x,'wordXValue',s.x],['wordY',s.y,'wordYValue',s.y],['wordRotate',s.rotate,'wordRotateValue',s.rotate+'°'],['wordTracking',s.tracking*100,'wordTrackingValue',Math.round(s.tracking*100)+'%'],['wordNeon',s.neon*100,'wordNeonValue',Math.round(s.neon*100)+'%']];values.forEach(([id,value,out,label])=>{const el=$('#'+id);el.value=value;$('#'+out).textContent=label;updateRange(el)})}
 function addAvailableFont(font){if(!availableFonts.includes(font))availableFonts.push(font);const global=$('#fontSelect');if(global&&![...global.options].some(o=>o.value===font)){const option=document.createElement('option');option.value=font;option.textContent=font.toUpperCase();global.insertBefore(option,global.querySelector('option[value="custom"]'))}populateWordFonts()}
 
+function projectSnapshot(){
+  return{version:2,state:{...state,playing:false,reference:null,customFigure:null},palette:[...palette],wordStyles:wordStyles.map(style=>({...style}))};
+}
+function scheduleAutosave(){
+  if(restoringProject)return;
+  $('#saveState').textContent='SAVING…';clearTimeout(autosaveTimer);autosaveTimer=setTimeout(()=>{try{localStorage.setItem(PROJECT_KEY,JSON.stringify(projectSnapshot()));$('#saveState').textContent='AUTO-SAVED'}catch{$('#saveState').textContent='SAVE LIMITED'}},250);
+}
+function openProjectDB(){return new Promise((resolve,reject)=>{const request=indexedDB.open(DB_NAME,1);request.onupgradeneeded=()=>request.result.createObjectStore('assets');request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error)})}
+async function storeAsset(key,value){try{const db=await openProjectDB();await new Promise((resolve,reject)=>{const tx=db.transaction('assets','readwrite');tx.objectStore('assets').put(value,key);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error)});db.close()}catch{}}
+async function readAsset(key){try{const db=await openProjectDB(),value=await new Promise((resolve,reject)=>{const request=db.transaction('assets').objectStore('assets').get(key);request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error)});db.close();return value}catch{return null}}
+function syncProjectUI(){
+  $('#titleInput').value=state.title;$('#subtitleInput').value=state.subtitle;$('#figureShape').value=state.figure;$('#lightingMode').value=state.lighting;$('#fontSelect').value=[...$('#fontSelect').options].some(o=>o.value===state.font)?state.font:'Manrope';$('#fontWeight').value=String(state.fontWeight);$('#textAlign').value=state.textAlign;$('#waveStyle').value=state.waveStyle;$('#neonColor').value=state.neonColor;$('#neonMode').value=state.neonMode;
+  const ranges=[['influence',state.influence*100,'influenceValue'],['motion',state.motion*100,'motionValue'],['waveRadius',state.waveRadius*100,'waveRadiusValue'],['waveWeight',state.waveWeight*100,'waveWeightValue'],['figureScale',state.figureScale*100,'figureScaleValue'],['warp',state.warp*100,'warpValue'],['transientPunch',state.transientPunch*100,'transientPunchValue'],['lightIntensity',state.lightIntensity*100,'lightValue'],['bloom',state.bloom*100,'bloomValue'],['tracking',state.tracking*100,'trackingValue'],['neonIntensity',state.neonIntensity*100,'neonIntensityValue'],['neonSpread',state.neonSpread*100,'neonSpreadValue']];
+  ranges.forEach(([id,value,out])=>{const el=$('#'+id),rounded=Math.round(value);el.value=rounded;$('#'+out).textContent=rounded+'%';updateRange(el)});$('#beamAngle').value=state.beamAngle;$('#beamValue').textContent=state.beamAngle+'°';updateRange($('#beamAngle'));
+  $$('[data-element]').forEach(el=>el.checked=state.elements[el.dataset.element]!==false);syncWords();
+}
+function loadSavedProject(){
+  try{const saved=JSON.parse(localStorage.getItem(PROJECT_KEY));if(!saved?.state)return;restoringProject=true;Object.assign(state,saved.state,{playing:false,reference:null,customFigure:null});if(saved.palette?.length===3)saved.palette.forEach((color,i)=>setPalette(i,color));wordStyles=Array.isArray(saved.wordStyles)?saved.wordStyles.map(style=>({...defaultWordStyle(),...style})):[];syncProjectUI();$('#saveState').textContent='PROJECT RESTORED'}catch{$('#saveState').textContent='NEW PROJECT'}finally{restoringProject=false}
+}
+async function restoreProjectAssets(){
+  const [savedAudio,savedReferences,savedCore,savedFonts]=await Promise.all([readAsset('audio'),readAsset('references'),readAsset('core'),readAsset('fonts')]);
+  if(savedAudio)loadAudio(savedAudio,false);if(Array.isArray(savedReferences)){referenceFiles=[...savedReferences];savedReferences.forEach(file=>loadReference(file,false))}if(savedCore)loadCoreImage(savedCore,false,false);if(Array.isArray(savedFonts)){uploadedFontFiles=[...savedFonts];await loadFontFiles(savedFonts,false);if(availableFonts.includes(state.font)){$('#fontSelect').value=state.font;populateWordFonts()}}
+}
+function getPresets(){try{return JSON.parse(localStorage.getItem(PRESET_KEY))||[]}catch{return[]}}
+function refreshPresets(selected=''){const presets=getPresets(),select=$('#presetSelect');select.innerHTML='';if(!presets.length){select.add(new Option('NO PRESETS YET',''));return}presets.forEach(preset=>select.add(new Option(preset.name,preset.id)));select.value=selected||presets[0].id}
+function saveNamedPreset(){const name=$('#presetName').value.trim();if(!name){$('#presetName').focus();return}const presets=getPresets(),existing=presets.find(p=>p.name.toLowerCase()===name.toLowerCase()),preset={id:existing?.id||String(Date.now()),name,...projectSnapshot()};const next=existing?presets.map(p=>p.id===existing.id?preset:p):[...presets,preset];localStorage.setItem(PRESET_KEY,JSON.stringify(next));refreshPresets(preset.id);$('#presetName').value='';$('#saveState').textContent='PRESET SAVED'}
+function loadNamedPreset(){const preset=getPresets().find(p=>p.id===$('#presetSelect').value);if(!preset)return;restoringProject=true;Object.assign(state,preset.state,{playing:false,reference:state.reference,customFigure:state.customFigure});preset.palette.forEach((color,i)=>setPalette(i,color));wordStyles=preset.wordStyles.map(style=>({...defaultWordStyle(),...style}));syncProjectUI();restoringProject=false;scheduleAutosave();$('#saveState').textContent='PRESET LOADED'}
+function deleteNamedPreset(){const id=$('#presetSelect').value;if(!id)return;localStorage.setItem(PRESET_KEY,JSON.stringify(getPresets().filter(p=>p.id!==id)));refreshPresets();$('#saveState').textContent='PRESET DELETED'}
+
 function setupAudio() {
   if (audioContext) return;
   audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -49,7 +80,7 @@ function setupAudio() {
   dataArray = new Uint8Array(analyser.fftSize); frequencyArray = new Uint8Array(analyser.frequencyBinCount);
 }
 
-function loadAudio(file) {
+function loadAudio(file,persist=true) {
   if (!file?.type.startsWith('audio/')) return;
   loadedAudioFile=file;
   if (objectUrl) URL.revokeObjectURL(objectUrl);
@@ -57,23 +88,28 @@ function loadAudio(file) {
   $('#trackName').textContent = file.name; $('#trackMeta').textContent = `${(file.size/1048576).toFixed(1)} MB · READY`;
   $('#audioDropzone').classList.add('hidden'); $('#trackChip').classList.remove('hidden');
   $('#exportNote').textContent = 'Ready to play and record your visual.'; $('#exportNote').classList.remove('error');
+  if(persist)storeAsset('audio',file);scheduleAutosave();
 }
 
-function loadReference(file) {
+function loadReference(file,persist=true) {
   if (!file?.type.startsWith('image/')) return;
   const url = URL.createObjectURL(file); const img = new Image();
   img.onload = () => { state.reference = img; extractPalette(img); };
   img.src = url;
   const thumb = document.createElement('img'); thumb.src = url; thumb.className = 'reference-thumb'; thumb.alt = file.name;
   const list = $('#referenceList'); if (list.children.length >= 4) list.firstElementChild.remove(); list.append(thumb);
+  if(persist){referenceFiles.push(file);referenceFiles=referenceFiles.slice(-4);storeAsset('references',referenceFiles)}scheduleAutosave();
 }
 
-function loadCoreImage(file){
+function loadCoreImage(file,persist=true,activate=true){
   if(!file?.type.startsWith('image/'))return;
   const url=URL.createObjectURL(file),img=new Image();
-  img.onload=()=>{state.customFigure=img;state.figure='image';$('#figureShape').value='image';$('#coreImageLabel strong').textContent=file.name.toUpperCase();};
+  img.onload=()=>{state.customFigure=img;if(activate){state.figure='image';$('#figureShape').value='image'}$('#coreImageLabel strong').textContent=file.name.toUpperCase();};
   img.src=url;
+  coreImageFile=file;if(persist)storeAsset('core',file);scheduleAutosave();
 }
+
+async function loadFontFiles(files,persist=true){let lastFont='';for(const file of files){try{const family=file.name.replace(/\.[^.]+$/,'').replace(/[^a-zA-Z0-9 _-]/g,'').trim()||('UserFont'+Date.now());const face=new FontFace(family,`url(${URL.createObjectURL(file)})`);await face.load();document.fonts.add(face);addAvailableFont(family);lastFont=family}catch{$('#exportNote').textContent=`${file.name} could not be loaded.`;$('#exportNote').classList.add('error')}}if(persist){uploadedFontFiles=[...files];storeAsset('fonts',uploadedFontFiles)}return lastFont}
 
 function extractPalette(img) {
   const c = document.createElement('canvas'); c.width = c.height = 24; const x = c.getContext('2d');
@@ -195,7 +231,8 @@ function updateRange(el){const p=(el.value-el.min)/(el.max-el.min)*100;el.style.
 $('#audioInput').addEventListener('change',e=>loadAudio(e.target.files[0]));
 $('#referenceInput').addEventListener('change',e=>[...e.target.files].forEach(loadReference));
 $('#coreImageInput').addEventListener('change',e=>loadCoreImage(e.target.files[0]));
-$('#removeTrack').addEventListener('click',()=>{audio.pause();audio.removeAttribute('src');loadedAudioFile=null;$('#audioDropzone').classList.remove('hidden');$('#trackChip').classList.add('hidden');});
+$('#savePreset').addEventListener('click',saveNamedPreset);$('#loadPreset').addEventListener('click',loadNamedPreset);$('#deletePreset').addEventListener('click',deleteNamedPreset);
+$('#removeTrack').addEventListener('click',()=>{audio.pause();audio.removeAttribute('src');loadedAudioFile=null;storeAsset('audio',null);$('#audioDropzone').classList.remove('hidden');$('#trackChip').classList.add('hidden');scheduleAutosave()});
 $('#playButton').addEventListener('click',async()=>{if(!audio.src){$('#audioInput').click();return}setupAudio();await audioContext.resume();audio.paused?audio.play():audio.pause();});
 audio.addEventListener('play',()=>{$('#playButton').textContent='❚❚';state.playing=true});audio.addEventListener('pause',()=>{$('#playButton').textContent='▶';state.playing=false});
 audio.addEventListener('loadedmetadata',()=>$('#duration').textContent=formatTime(audio.duration));audio.addEventListener('timeupdate',()=>{$('#currentTime').textContent=formatTime(audio.currentTime);$('#timeline').value=audio.duration?audio.currentTime/audio.duration*1000:0;updateRange($('#timeline'));});
@@ -210,7 +247,7 @@ $('#lightingMode').addEventListener('change',e=>state.lighting=e.target.value);
 $('#transientPunch').addEventListener('input',e=>{state.transientPunch=e.target.value/100;$('#transientPunchValue').textContent=e.target.value+'%';updateRange(e.target)});
 $('#beamAngle').addEventListener('input',e=>{state.beamAngle=+e.target.value;$('#beamValue').textContent=e.target.value+'°';updateRange(e.target)});
 $('#fontSelect').addEventListener('change',e=>{if(e.target.value==='custom'){$('#fontUploadLabel').classList.remove('hidden');$('#fontInput').click()}else{state.font=e.target.value;addAvailableFont(state.font);wordStyles.forEach(s=>s.font=state.font);syncWordControls();$('#fontUploadLabel').classList.add('hidden')}});
-$('#fontInput').addEventListener('change',async e=>{const files=[...e.target.files];if(!files.length)return;let lastFont='';for(const file of files){try{const family=file.name.replace(/\.[^.]+$/,'').replace(/[^a-zA-Z0-9 _-]/g,'').trim()||('UserFont'+Date.now());const face=new FontFace(family,`url(${URL.createObjectURL(file)})`);await face.load();document.fonts.add(face);addAvailableFont(family);lastFont=family}catch{$('#exportNote').textContent=`${file.name} could not be loaded.`;$('#exportNote').classList.add('error')}}if(lastFont){state.font=lastFont;wordStyles.forEach(s=>s.font=lastFont);$('#fontSelect').value=lastFont;$('#fontUploadLabel').classList.add('hidden');syncWordControls()}});
+$('#fontInput').addEventListener('change',async e=>{const files=[...e.target.files];if(!files.length)return;const lastFont=await loadFontFiles(files);if(lastFont){state.font=lastFont;wordStyles.forEach(s=>s.font=lastFont);$('#fontSelect').value=lastFont;$('#fontUploadLabel').classList.add('hidden');syncWordControls();scheduleAutosave()}});
 $('#applyFontFamily').addEventListener('click',()=>{const family=$('#fontFamilyInput').value.trim();if(!family)return;addAvailableFont(family);state.font=family;wordStyles.forEach(s=>s.font=family);syncWordControls();$('#exportNote').textContent=`Using ${family}. If it is installed, the browser will render it.`});
 $('#fontWeight').addEventListener('change',e=>{state.fontWeight=+e.target.value;wordStyles.forEach(s=>s.weight=state.fontWeight);syncWordControls()});$('#textAlign').addEventListener('change',e=>state.textAlign=e.target.value);
 $('#tracking').addEventListener('input',e=>{state.tracking=e.target.value/100;wordStyles.forEach(s=>s.tracking=state.tracking);$('#trackingValue').textContent=e.target.value+'%';updateRange(e.target);syncWordControls()});
@@ -276,4 +313,5 @@ $('#exportButton').addEventListener('click',exportVideo);audio.addEventListener(
 ['audioDropzone','referenceDropzone','canvasStage'].forEach(id=>{const el=$('#'+id);el.addEventListener('dragover',e=>{e.preventDefault();$('#dropOverlay').classList.add('visible')});el.addEventListener('dragleave',()=>$('#dropOverlay').classList.remove('visible'));el.addEventListener('drop',e=>{e.preventDefault();$('#dropOverlay').classList.remove('visible');[...e.dataTransfer.files].forEach(f=>f.type.startsWith('audio/')?loadAudio(f):loadReference(f))});});
 $('#helpButton').addEventListener('click',()=>$('#helpDialog').showModal());$('#closeHelp').addEventListener('click',()=>$('#helpDialog').close());
 document.addEventListener('keydown',e=>{if(['INPUT','TEXTAREA'].includes(e.target.tagName))return;if(e.code==='Space'){e.preventDefault();$('#playButton').click()}if(e.key.toLowerCase()==='r')randomizePalette();if(e.key.toLowerCase()==='s')$('#shuffleLook').click()});
-syncWords();populateWordFonts();$$('.range').forEach(updateRange);requestAnimationFrame(draw);
+document.addEventListener('input',scheduleAutosave);document.addEventListener('change',scheduleAutosave);
+populateWordFonts();loadSavedProject();refreshPresets();$$('.range').forEach(updateRange);restoreProjectAssets();requestAnimationFrame(draw);
