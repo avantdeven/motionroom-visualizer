@@ -4,17 +4,17 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#08080a">
-  <title>Motionroom — Beat Visualizer Studio</title>
+  <title>VizionEngine — Beat Visualizer Studio</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=cancel7">
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@300;400;500&family=Manrope:wght@400;500;600;700&family=Montserrat:wght@400;600;800&family=Playfair+Display:wght@400;600;800&family=Poppins:wght@400;600;800&family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css?v=vizion8">
 </head>
 <body>
   <header class="topbar">
-    <a class="brand" href="#" aria-label="Motionroom home">
+    <a class="brand" href="#" aria-label="VizionEngine home">
       <span class="brand-mark"><i></i><i></i><i></i></span>
-      <span>MOTIONROOM</span>
+      <span>VIZIONENGINE</span>
     </a>
     <span class="project-state"><span></span> PROJECT / UNTITLED 001</span>
     <button class="icon-button" id="helpButton" aria-label="Show keyboard shortcuts">?</button>
@@ -94,6 +94,13 @@
         </div>
         <label class="range-label"><span>MOTION</span><output id="motionValue">68%</output></label>
         <input class="range" id="motion" type="range" min="10" max="100" value="68">
+        <label class="field-label" for="visualMode">VISUAL MODE</label>
+        <select class="select-input" id="visualMode">
+          <option value="cyber">CYBER NEON</option>
+          <option value="cartoon">CARTOON CEL</option>
+          <option value="comic">COMIC INK</option>
+          <option value="modern">SLEEK MODERN</option>
+        </select>
 
         <div class="sub-control wave-control">
           <label class="field-label" for="waveStyle">WAVEFORM STYLE</label>
@@ -109,6 +116,11 @@
             <option value="shards">SHARD RING</option>
             <option value="electric">ELECTRIC ARC</option>
             <option value="tunnel">PULSE TUNNEL</option>
+            <option value="sonar">SONAR SWEEP</option>
+            <option value="chain">CHAIN LINKS</option>
+            <option value="steps">STEP CIRCUIT</option>
+            <option value="comet">COMET TRAILS</option>
+            <option value="ripple">RESONANCE RIPPLE</option>
           </select>
         </div>
         <label class="range-label"><span>WAVE DISTANCE</span><output id="waveRadiusValue">68%</output></label>
@@ -128,6 +140,11 @@
             <option value="hex">HEX REACTOR</option>
             <option value="eye">SYNTH EYE</option>
             <option value="cross">CHROME CROSS</option>
+            <option value="crescent">LUNAR CRESCENT</option>
+            <option value="cube">WIRE CUBE</option>
+            <option value="heart">PULSE HEART</option>
+            <option value="bolt">ENERGY BOLT</option>
+            <option value="lotus">LOTUS ENGINE</option>
             <option value="image">UPLOADED IMAGE</option>
           </select>
         </div>
@@ -270,6 +287,6 @@
   </dialog>
 
   <audio id="audio" crossorigin="anonymous"></audio>
-  <script src="app.js?v=cancel7"></script>
+  <script src="app.js?v=vizion8"></script>
 </body>
 </html>
