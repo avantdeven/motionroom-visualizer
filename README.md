@@ -1,4 +1,4 @@
-# Motionroom
+# VizionEngine
 
 An in-browser, audio-reactive beat visualizer studio.
 
