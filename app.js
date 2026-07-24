@@ -177,7 +177,10 @@ function drawLighting(w,h,cx,cy,energy,t){
 }
 
 function drawFigure(w,h,cx,cy,bass,beat,t){
-  if(!state.elements.pulse)return;const kick=beat*beat,low=Math.min(1,bass*1.35),hit=Math.max(kick,low*.42),size=Math.min(w,h)*state.figureScale*(.72+low*.14+kick*.42),warp=state.warp;
+  if(!state.elements.pulse)return;const kick=beat*beat,low=Math.min(1,bass*1.35),hit=Math.max(kick,low*.42),minSide=Math.min(w,h),warp=state.warp;
+  const extent={portal:.51,diamond:.55,monolith:.55,orb:.51,spire:.65,star:.55,hex:.5,eye:.5,cross:.5,crescent:.47,cube:.5,heart:.62,bolt:.58,lotus:.5,image:.45}[state.figure]||.52;
+  const waveBase=minSide*state.figureScale*(.42+state.waveRadius*.36),waveWeight=1+state.waveWeight*5,safeRadius=Math.max(2,Math.min(waveBase*.78,waveBase-minSide*.1-waveWeight*4));
+  const intendedSize=minSide*state.figureScale*(.76+low*.025+kick*.065),size=Math.min(intendedSize,safeRadius/extent);
   const bounce=-Math.min(h*.045,kick*h*.04+low*h*.008),rot=Math.sin(t*.004)*(kick*.055+low*.012);
   const flash=ctx.createRadialGradient(cx,cy+bounce,0,cx,cy+bounce,size*(.7+hit*.7));flash.addColorStop(0,rgba(palette[0],hit*.38));flash.addColorStop(.32,rgba(palette[1],hit*.16));flash.addColorStop(1,'transparent');ctx.fillStyle=flash;ctx.fillRect(cx-size,cy-size+bounce,size*2,size*2);
   ctx.save();ctx.translate(cx,cy+bounce);ctx.rotate(rot);ctx.globalCompositeOperation=state.visualMode==='comic'?'source-over':'screen';ctx.lineJoin='round';ctx.lineCap='round';ctx.lineWidth=(state.visualMode==='comic'?5:2)+low*3+kick*7;ctx.strokeStyle=state.visualMode==='comic'?'#f8f5ed':palette[0];ctx.fillStyle=rgba(palette[2],state.visualMode==='cartoon'?.28:.07+low*.09+kick*.16);ctx.shadowBlur=state.visualMode==='modern'?5:10+state.bloom*45+kick*70;ctx.shadowColor=palette[0];ctx.beginPath();
