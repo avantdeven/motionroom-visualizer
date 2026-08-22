@@ -16,13 +16,15 @@ const state = {
   font: 'Manrope', fontWeight: 600, textAlign: 'center', tracking: .3,
   neonColor: '#15f5d1', neonIntensity: .72, neonSpread: .56, neonMode: 'solid',
   transientPunch: .78,
-  waveStyle: 'smooth', waveRadius: .68, waveWeight: .45
+  waveStyle: 'smooth', waveRadius: .68, waveWeight: .45,
+  atmosphere: { mode: 'nebula', density: .48, depth: .62, drift: .35 },
+  reactiveLayer: { element: 'orbs', source: 'bass', motion: 'orbit', count: 18, response: .72, x: 0, y: 0 }
 };
 let audioContext, analyser, source, mediaDest, dataArray, frequencyArray, objectUrl, loadedAudioFile;
 let recorder, chunks = [], recording = false;
 let exportTimer = null, exportTarget = 0;
 let bassFloor = .08, beatPulse = 0, lastBeatAt = 0, transientFloor = .025, transientPulse = 0, lastTransientAt = 0;
-let previousSpectrum = new Uint8Array(256);
+let previousSpectrum = new Uint8Array(1024);
 let wordStyles = [], selectedWord = 0;
 let offlineRendering = false, exportCancelRequested = false;
 let autosaveTimer = null, restoringProject = false, referenceFiles = [], referenceItems = [], coreImageFile = null, uploadedFontFiles = [];
@@ -54,8 +56,9 @@ async function storeAsset(key,value){try{const db=await openProjectDB();await ne
 async function readAsset(key){try{const db=await openProjectDB(),value=await new Promise((resolve,reject)=>{const request=db.transaction('assets').objectStore('assets').get(key);request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error)});db.close();return value}catch{return null}}
 function syncProjectUI(){
   $('#titleInput').value=state.title;$('#subtitleInput').value=state.subtitle;$('#figureShape').value=state.figure;$('#visualMode').value=state.visualMode||'cyber';$('#lightingMode').value=state.lighting;$('#fontSelect').value=[...$('#fontSelect').options].some(o=>o.value===state.font)?state.font:'Manrope';$('#fontWeight').value=String(state.fontWeight);$('#textAlign').value=state.textAlign;$('#waveStyle').value=state.waveStyle;$('#neonColor').value=state.neonColor;$('#neonMode').value=state.neonMode;
-  const ranges=[['influence',state.influence*100,'influenceValue'],['motion',state.motion*100,'motionValue'],['waveRadius',state.waveRadius*100,'waveRadiusValue'],['waveWeight',state.waveWeight*100,'waveWeightValue'],['figureScale',state.figureScale*100,'figureScaleValue'],['warp',state.warp*100,'warpValue'],['transientPunch',state.transientPunch*100,'transientPunchValue'],['lightIntensity',state.lightIntensity*100,'lightValue'],['bloom',state.bloom*100,'bloomValue'],['tracking',state.tracking*100,'trackingValue'],['neonIntensity',state.neonIntensity*100,'neonIntensityValue'],['neonSpread',state.neonSpread*100,'neonSpreadValue']];
-  ranges.forEach(([id,value,out])=>{const el=$('#'+id),rounded=Math.round(value);el.value=rounded;$('#'+out).textContent=rounded+'%';updateRange(el)});$('#beamAngle').value=state.beamAngle;$('#beamValue').textContent=state.beamAngle+'°';updateRange($('#beamAngle'));
+  state.atmosphere={mode:'nebula',density:.48,depth:.62,drift:.35,...state.atmosphere};state.reactiveLayer={element:'orbs',source:'bass',motion:'orbit',count:18,response:.72,x:0,y:0,...state.reactiveLayer};$('#atmosphereMode').value=state.atmosphere.mode;$('#reactiveElement').value=state.reactiveLayer.element;$('#reactiveSource').value=state.reactiveLayer.source;$('#reactiveMotion').value=state.reactiveLayer.motion;$('#reactiveX').value=state.reactiveLayer.x;$('#reactiveY').value=state.reactiveLayer.y;
+  const ranges=[['influence',state.influence*100,'influenceValue'],['motion',state.motion*100,'motionValue'],['waveRadius',state.waveRadius*100,'waveRadiusValue'],['waveWeight',state.waveWeight*100,'waveWeightValue'],['figureScale',state.figureScale*100,'figureScaleValue'],['warp',state.warp*100,'warpValue'],['transientPunch',state.transientPunch*100,'transientPunchValue'],['lightIntensity',state.lightIntensity*100,'lightValue'],['bloom',state.bloom*100,'bloomValue'],['tracking',state.tracking*100,'trackingValue'],['neonIntensity',state.neonIntensity*100,'neonIntensityValue'],['neonSpread',state.neonSpread*100,'neonSpreadValue'],['atmosphereDensity',state.atmosphere.density*100,'atmosphereDensityValue'],['atmosphereDepth',state.atmosphere.depth*100,'atmosphereDepthValue'],['atmosphereDrift',state.atmosphere.drift*100,'atmosphereDriftValue'],['reactiveCount',state.reactiveLayer.count,'reactiveCountValue'],['reactiveResponse',state.reactiveLayer.response*100,'reactiveResponseValue']];
+  ranges.forEach(([id,value,out])=>{const el=$('#'+id),rounded=Math.round(value);el.value=rounded;$('#'+out).textContent=rounded+(id==='reactiveCount'?'':'%');updateRange(el)});['reactiveX','reactiveY'].forEach(id=>updateRange($('#'+id)));$('#beamAngle').value=state.beamAngle;$('#beamValue').textContent=state.beamAngle+'°';updateRange($('#beamAngle'));
   $$('[data-element]').forEach(el=>el.checked=state.elements[el.dataset.element]!==false);$$('[data-reference-affect]').forEach(el=>el.checked=state.referenceAffects?.[el.dataset.referenceAffect]!==false);syncWords();
 }
 function loadSavedProject(){
@@ -74,7 +77,7 @@ function deleteNamedPreset(){const id=$('#presetSelect').value;if(!id)return;loc
 function setupAudio() {
   if (audioContext) return;
   audioContext = new (window.AudioContext || window.webkitAudioContext)();
-  analyser = audioContext.createAnalyser(); analyser.fftSize = 512; analyser.smoothingTimeConstant = .83;
+  analyser = audioContext.createAnalyser(); analyser.fftSize = 2048; analyser.smoothingTimeConstant = .68;analyser.minDecibels=-96;analyser.maxDecibels=-18;
   source = audioContext.createMediaElementSource(audio);
   mediaDest = audioContext.createMediaStreamDestination();
   source.connect(analyser); analyser.connect(audioContext.destination); analyser.connect(mediaDest);
@@ -146,18 +149,18 @@ function applyReferenceInfluence(img=state.reference){
 function setPalette(i, color) { palette[i]=color; const el=$(`[data-color="${i}"]`); el.value=color; el.nextElementSibling.textContent=color.toUpperCase(); document.documentElement.style.setProperty(['--acid','--pink','--violet'][i],color); }
 
 function getAudioData(t) {
-  if (!dataArray) { dataArray=new Uint8Array(512); frequencyArray=new Uint8Array(256); dataArray.fill(128); }
+  if (!dataArray) { dataArray=new Uint8Array(2048); frequencyArray=new Uint8Array(1024); dataArray.fill(128); }
   if (analyser && !audio.paused && !audio.ended) { analyser.getByteTimeDomainData(dataArray); analyser.getByteFrequencyData(frequencyArray); }
   else { dataArray.fill(128); frequencyArray.fill(0); beatPulse=0; transientPulse=0; previousSpectrum.fill(0); }
-  let bass=0,mid=0; for(let i=0;i<24;i++)bass+=frequencyArray[i]||0; for(let i=24;i<100;i++)mid+=frequencyArray[i]||0;
-  const bassLevel=bass/(24*255),midLevel=mid/(76*255);bassFloor=bassFloor*.94+bassLevel*.06;
-  if(!audio.paused&&bassLevel>Math.max(.13,bassFloor*1.28)&&t-lastBeatAt>105){beatPulse=1;lastBeatAt=t}
-  let flux=0;for(let i=2;i<150;i++){const current=(frequencyArray[i]||0)/255;const previous=(previousSpectrum[i]||0)/255;flux+=Math.max(0,current-previous);previousSpectrum[i]=frequencyArray[i]||0}flux/=148;
+  const nyquist=(audioContext?.sampleRate||48000)/2,binHz=nyquist/frequencyArray.length,band=(low,high)=>{const a=Math.max(0,Math.floor(low/binHz)),b=Math.min(frequencyArray.length-1,Math.ceil(high/binHz));let sum=0,weight=0;for(let i=a;i<=b;i++){const hz=(i+.5)*binHz,w=1/Math.max(1,Math.sqrt(hz/low));sum+=(frequencyArray[i]||0)*w;weight+=w}return weight?sum/(weight*255):0};
+  const sub=band(28,70),bassLevel=band(45,160),midLevel=band(160,2400),highLevel=band(2400,15000),kickEnergy=sub*.62+bassLevel*.38;bassFloor=bassFloor*.95+kickEnergy*.05;
+  if(!audio.paused&&kickEnergy>Math.max(.115,bassFloor*1.34)&&t-lastBeatAt>92){beatPulse=Math.min(1,.55+(kickEnergy-bassFloor)*3.2);lastBeatAt=t}
+  const fluxStart=Math.floor(1800/binHz),fluxEnd=Math.min(frequencyArray.length-1,Math.ceil(16000/binHz));let flux=0,fluxBins=0;for(let i=0;i<frequencyArray.length;i++){const current=(frequencyArray[i]||0)/255,previous=(previousSpectrum[i]||0)/255;if(i>=fluxStart&&i<=fluxEnd){flux+=Math.max(0,current-previous);fluxBins++}previousSpectrum[i]=frequencyArray[i]||0}flux/=Math.max(1,fluxBins);
   transientFloor=transientFloor*.94+flux*.06;
   if(!audio.paused&&flux>Math.max(.018,transientFloor*(1.35+(1-state.transientPunch)*.75))&&t-lastTransientAt>70){transientPulse=Math.min(1,flux*11+.38);lastTransientAt=t}
   beatPulse*=.86;
   transientPulse*=.79;
-  return {bass:bassLevel,mid:midLevel,beat:beatPulse,transient:transientPulse};
+  return {sub,bass:bassLevel,mid:midLevel,high:highLevel,beat:beatPulse,transient:transientPulse};
 }
 
 function drawLighting(w,h,cx,cy,energy,t){
@@ -260,17 +263,31 @@ function drawModeOverlay(w,h,cx,cy,energy,t){
   }
 }
 
+function drawAtmosphere(w,h,cx,cy,signals,t){
+  const a=state.atmosphere,d=a.density,drift=t*.000035*a.drift,reactive=.45+signals.mid*.65+signals.high*.25;if(a.mode!=='clean'&&d>0){ctx.save();ctx.globalCompositeOperation='screen';for(let i=0;i<6;i++){const phase=drift*(i%2?1:-1)+i*1.73,x=w*(.12+seeded(i*13.7)*.76)+Math.cos(phase)*w*.12*a.drift,y=h*(.12+seeded(i*8.9)*.76)+Math.sin(phase*.8)*h*.1*a.drift,r=Math.min(w,h)*(.18+seeded(i*4.1)*.2)*(1+signals.mid*.14);const g=ctx.createRadialGradient(x,y,0,x,y,r);const color=a.mode==='smoke'?'#6f7c91':a.mode==='aurora'?palette[(i+1)%3]:a.mode==='dust'?'#d9c7a0':palette[i%3];g.addColorStop(0,rgba(color,d*(a.mode==='smoke'?.07:.11)*reactive));g.addColorStop(1,'transparent');ctx.fillStyle=g;ctx.fillRect(x-r,y-r,r*2,r*2)}ctx.restore()}
+  if(a.depth>0){ctx.save();const vg=ctx.createRadialGradient(cx,cy,Math.min(w,h)*.2,cx,cy,Math.max(w,h)*.68);vg.addColorStop(0,'transparent');vg.addColorStop(.62,`rgba(0,0,0,${a.depth*.12})`);vg.addColorStop(1,`rgba(0,0,0,${a.depth*.78})`);ctx.fillStyle=vg;ctx.fillRect(0,0,w,h);ctx.restore()}
+}
+
+function drawReactiveLayer(w,h,cx,cy,signals,t){
+  const r=state.reactiveLayer;if(!r||r.element==='none')return;const signal=Math.min(1,(signals[r.source]??signals.mid??0)*r.response),ox=cx+w*r.x/100,oy=cy+h*r.y/100,count=Math.round(r.count);ctx.save();ctx.globalCompositeOperation='screen';ctx.shadowColor=palette[0];ctx.shadowBlur=8+signal*22;
+  for(let i=0;i<count;i++){const seed=seeded(i*9.31),phase=i/count*Math.PI*2,tick=t*.00022*(.3+state.motion),radius=Math.min(w,h)*(.16+seed*.34);let x=ox,y=oy,rotation=phase,size=2+seed*5+signal*9;if(r.motion==='orbit'){x+=Math.cos(phase+tick*(i%2?1:-1))*radius*(1+signal*.15);y+=Math.sin(phase+tick*(i%2?1:-1))*radius*.62*(1+signal*.12);rotation=phase+tick}else if(r.motion==='float'){x+=((seeded(i*4.7)+tick*.05*(i%2?1:-1))%1-.5)*w*.72;y+=Math.sin(tick*2+i)*h*.13+(seeded(i*7.2)-.5)*h*.52}else if(r.motion==='rise'){x+=(seeded(i*5.2)-.5)*w*.68;y+=h*.42-((seeded(i*2.8)+tick*.08*(.5+signal))%1)*h*.84}else{x+=Math.cos(phase)*radius*(.45+signal*.75);y+=Math.sin(phase)*radius*(.28+signal*.55);rotation=phase}
+    ctx.save();ctx.translate(x,y);ctx.rotate(rotation);ctx.fillStyle=rgba(palette[i%3],.16+signal*.58);ctx.strokeStyle=rgba(palette[(i+1)%3],.3+signal*.55);ctx.lineWidth=1+signal*2;if(r.element==='streaks'){ctx.fillRect(-size*3,-1,size*6,1+signal*3)}else if(r.element==='shards'){ctx.beginPath();ctx.moveTo(0,-size);ctx.lineTo(size*.55,size);ctx.lineTo(-size*.38,size*.5);ctx.closePath();ctx.fill();ctx.stroke()}else{ctx.beginPath();ctx.arc(0,0,r.element==='bubbles'?size*1.5:size,0,Math.PI*2);if(r.element==='bubbles')ctx.stroke();else ctx.fill()}ctx.restore()
+  }ctx.restore()
+}
+
 function draw(t,manual=false,snapshot=null) {
   if(offlineRendering&&!manual){requestAnimationFrame(draw);return}
-  const w=canvas.width,h=canvas.height,cx=w/2,cy=h/2; const {bass,mid,beat,transient=beat}=snapshot||getAudioData(t); const energy=Math.min(1,bass*1.7+mid*.35);
+  const w=canvas.width,h=canvas.height,cx=w/2,cy=h/2,signals=snapshot||getAudioData(t); const {bass=0,mid=0,high=mid,beat=0,transient=beat}=signals,energy=Math.min(1,bass*1.55+mid*.32+high*.12);
   ctx.fillStyle=state.visualMode==='comic'?'#101014':state.visualMode==='cartoon'?'#090d16':state.visualMode==='modern'?'#05080b':'#070709';ctx.fillRect(0,0,w,h);
   if(state.reference&&state.referenceAffects.texture){ctx.save();ctx.globalAlpha=state.influence*.3;ctx.filter=`blur(${8+state.influence*16}px) saturate(1.5) contrast(1.1)`;const scale=Math.max(w/state.reference.width,h/state.reference.height);const iw=state.reference.width*scale,ih=state.reference.height*scale;ctx.drawImage(state.reference,(w-iw)/2,(h-ih)/2,iw,ih);ctx.restore();}
   const grad=ctx.createRadialGradient(cx,cy,0,cx,cy,w*.6);grad.addColorStop(0,rgba(palette[2],.18+energy*.12));grad.addColorStop(.4,rgba(palette[1],.07));grad.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=grad;ctx.fillRect(0,0,w,h);
   if(state.elements.grid){ctx.save();ctx.strokeStyle=rgba(palette[2],.14);ctx.lineWidth=1;const gap=Math.max(36,w/24),off=(t*.018*state.motion)%gap;for(let x=-gap+off;x<w;x+=gap){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,h);ctx.stroke()}for(let y=-gap+off;y<h;y+=gap){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(w,y);ctx.stroke()}ctx.restore();}
   drawLighting(w,h,cx,cy,energy,t);
+  drawAtmosphere(w,h,cx,cy,signals,t);
   if(state.elements.rings){ctx.save();ctx.translate(cx,cy);ctx.rotate(t*.00008*state.motion);for(let i=0;i<4;i++){ctx.beginPath();ctx.ellipse(0,0,w*(.13+i*.075)+energy*30,h*(.17+i*.035)+energy*18,t*.00015*(i%2?1:-1),0,Math.PI*2);ctx.strokeStyle=rgba(palette[i%3],.1+i*.055);ctx.lineWidth=i===0?3:1;ctx.stroke()}ctx.restore();}
   drawFigure(w,h,cx,cy,bass,beat,t);
   if(state.elements.particles){ctx.save();particles.forEach((p,i)=>{const drift=t*.00002*state.motion*(i%2?1:-1);const x=((p.x+drift)%1)*w,y=(p.y+Math.sin(t*.001+i)*.015)*h;ctx.fillStyle=rgba(palette[i%3],.25+p.z*.55);ctx.fillRect(x,y,p.s*(1+energy*2),p.s*(1+energy*2));});ctx.restore();}
+  drawReactiveLayer(w,h,cx,cy,signals,t);
   // Sound wave wraps the core and rests until audio plays.
   drawCoreWave(w,h,cx,cy,energy,transient,t);
   drawModeOverlay(w,h,cx,cy,energy,t);
@@ -305,6 +322,9 @@ $('#lightingMode').addEventListener('change',e=>state.lighting=e.target.value);
 [['figureScale','figureScaleValue','figureScale','%'],['warp','warpValue','warp','%'],['lightIntensity','lightValue','lightIntensity','%'],['bloom','bloomValue','bloom','%']].forEach(([id,out,key,suffix])=>{$('#'+id).addEventListener('input',e=>{state[key]=e.target.value/100;$('#'+out).textContent=e.target.value+suffix;updateRange(e.target)})});
 $('#transientPunch').addEventListener('input',e=>{state.transientPunch=e.target.value/100;$('#transientPunchValue').textContent=e.target.value+'%';updateRange(e.target)});
 $('#beamAngle').addEventListener('input',e=>{state.beamAngle=+e.target.value;$('#beamValue').textContent=e.target.value+'°';updateRange(e.target)});
+$('#atmosphereMode').addEventListener('change',e=>state.atmosphere.mode=e.target.value);$('#reactiveElement').addEventListener('change',e=>state.reactiveLayer.element=e.target.value);$('#reactiveSource').addEventListener('change',e=>state.reactiveLayer.source=e.target.value);$('#reactiveMotion').addEventListener('change',e=>state.reactiveLayer.motion=e.target.value);
+[['atmosphereDensity','density','atmosphereDensityValue'],['atmosphereDepth','depth','atmosphereDepthValue'],['atmosphereDrift','drift','atmosphereDriftValue']].forEach(([id,key,out])=>$('#'+id).addEventListener('input',e=>{state.atmosphere[key]=e.target.value/100;$('#'+out).textContent=e.target.value+'%';updateRange(e.target)}));
+$('#reactiveCount').addEventListener('input',e=>{state.reactiveLayer.count=+e.target.value;$('#reactiveCountValue').textContent=e.target.value;updateRange(e.target)});$('#reactiveResponse').addEventListener('input',e=>{state.reactiveLayer.response=e.target.value/100;$('#reactiveResponseValue').textContent=e.target.value+'%';updateRange(e.target)});$('#reactiveX').addEventListener('input',e=>{state.reactiveLayer.x=+e.target.value;updateRange(e.target)});$('#reactiveY').addEventListener('input',e=>{state.reactiveLayer.y=+e.target.value;updateRange(e.target)});
 $('#fontSelect').addEventListener('change',e=>{if(e.target.value==='custom'){$('#fontUploadLabel').classList.remove('hidden');$('#fontInput').click()}else{state.font=e.target.value;addAvailableFont(state.font);wordStyles.forEach(s=>s.font=state.font);syncWordControls();$('#fontUploadLabel').classList.add('hidden')}});
 $('#fontInput').addEventListener('change',async e=>{const files=[...e.target.files];if(!files.length)return;const lastFont=await loadFontFiles(files);if(lastFont){state.font=lastFont;wordStyles.forEach(s=>s.font=lastFont);$('#fontSelect').value=lastFont;$('#fontUploadLabel').classList.add('hidden');syncWordControls();scheduleAutosave()}});
 $('#applyFontFamily').addEventListener('click',()=>{const family=$('#fontFamilyInput').value.trim();if(!family)return;addAvailableFont(family);state.font=family;wordStyles.forEach(s=>s.font=family);syncWordControls();$('#exportNote').textContent=`Using ${family}. If it is installed, the browser will render it.`});
@@ -339,9 +359,9 @@ async function exportRealtime(){
 }
 
 function offlineSnapshot(buffer,time,previousEnergy){
-  const channels=Array.from({length:buffer.numberOfChannels},(_,i)=>buffer.getChannelData(i)),center=Math.floor(time*buffer.sampleRate),windowSize=2048,timeData=new Uint8Array(512);let sum=0;
-  for(let i=0;i<512;i++){const index=Math.min(buffer.length-1,Math.max(0,center-1024+i*4));let value=0;channels.forEach(c=>value+=c[index]||0);value/=channels.length;timeData[i]=Math.max(0,Math.min(255,128+value*118));sum+=value*value}
-  const rms=Math.sqrt(sum/512),bass=Math.min(1,rms*3.8),mid=Math.min(1,rms*2.1),beat=bass>Math.max(.18,previousEnergy*1.35)?1:Math.max(0,(bass-previousEnergy)*2.5);return{timeData,bass,mid,beat};
+  const channels=Array.from({length:buffer.numberOfChannels},(_,i)=>buffer.getChannelData(i)),center=Math.floor(time*buffer.sampleRate),timeData=new Uint8Array(2048);let sum=0,derivative=0,previous=0;
+  for(let i=0;i<2048;i++){const index=Math.min(buffer.length-1,Math.max(0,center-1024+i));let value=0;channels.forEach(c=>value+=c[index]||0);value/=channels.length;timeData[i]=Math.max(0,Math.min(255,128+value*118));sum+=value*value;derivative+=Math.abs(value-previous);previous=value}
+  const rms=Math.sqrt(sum/2048),brightness=Math.min(1,derivative/2048*14),bass=Math.min(1,rms*3.8),mid=Math.min(1,rms*1.8+brightness*.25),high=Math.min(1,brightness),beat=bass>Math.max(.18,previousEnergy*1.35)?1:Math.max(0,(bass-previousEnergy)*2.5),transient=Math.min(1,Math.max(0,brightness-mid*.25)*1.8);return{timeData,bass,mid,high,beat,transient};
 }
 
 async function waitForEncoderQueue(encoder,maxSize=12){
