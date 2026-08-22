@@ -179,7 +179,35 @@
       </section>
 
       <section class="control-section">
-        <div class="section-title"><span>06</span><h2>TYPE</h2></div>
+        <div class="section-title"><span>06</span><h2>ATMOSPHERE + MOTION</h2></div>
+        <label class="field-label" for="atmosphereMode">ATMOSPHERE</label>
+        <select class="select-input" id="atmosphereMode"><option value="nebula">NEBULA FOG</option><option value="smoke">DARK SMOKE</option><option value="aurora">AURORA VEIL</option><option value="dust">COSMIC DUST</option><option value="clean">CLEAN AIR</option></select>
+        <label class="range-label"><span>ATMOSPHERE DENSITY</span><output id="atmosphereDensityValue">48%</output></label>
+        <input class="range" id="atmosphereDensity" type="range" min="0" max="100" value="48">
+        <label class="range-label"><span>DEPTH / VIGNETTE</span><output id="atmosphereDepthValue">62%</output></label>
+        <input class="range" id="atmosphereDepth" type="range" min="0" max="100" value="62">
+        <label class="range-label"><span>AMBIENT DRIFT</span><output id="atmosphereDriftValue">35%</output></label>
+        <input class="range" id="atmosphereDrift" type="range" min="0" max="100" value="35">
+        <div class="sub-control">
+          <label class="field-label" for="reactiveElement">MOVABLE ELEMENT</label>
+          <select class="select-input" id="reactiveElement"><option value="orbs">GLOW ORBS</option><option value="streaks">LIGHT STREAKS</option><option value="shards">FLOATING SHARDS</option><option value="bubbles">ATMOSPHERE BUBBLES</option><option value="none">OFF</option></select>
+          <div class="font-options">
+            <label><span>AUDIO SOURCE</span><select class="select-input" id="reactiveSource"><option value="bass">KICKS / 808</option><option value="mid">MIDS</option><option value="high">HI-HATS / HIGHS</option><option value="transient">TRANSIENTS</option></select></label>
+            <label><span>MOTION</span><select class="select-input" id="reactiveMotion"><option value="orbit">ORBIT</option><option value="float">FLOAT</option><option value="burst">BURST</option><option value="rise">RISE</option></select></label>
+          </div>
+        </div>
+        <label class="range-label"><span>ELEMENT COUNT</span><output id="reactiveCountValue">18</output></label>
+        <input class="range" id="reactiveCount" type="range" min="4" max="48" value="18">
+        <label class="range-label"><span>AUDIO RESPONSE</span><output id="reactiveResponseValue">72%</output></label>
+        <input class="range" id="reactiveResponse" type="range" min="0" max="150" value="72">
+        <div class="font-options">
+          <label><span>HORIZONTAL</span><input class="range compact-range" id="reactiveX" type="range" min="-50" max="50" value="0"></label>
+          <label><span>VERTICAL</span><input class="range compact-range" id="reactiveY" type="range" min="-50" max="50" value="0"></label>
+        </div>
+      </section>
+
+      <section class="control-section">
+        <div class="section-title"><span>07</span><h2>TYPE</h2></div>
         <label class="field-label" for="titleInput">TITLE</label>
         <input class="text-input" id="titleInput" value="NIGHT SHIFT" maxlength="28">
         <label class="field-label" for="subtitleInput">ARTIST / CAPTION</label>
@@ -287,6 +315,6 @@
   </dialog>
 
   <audio id="audio" crossorigin="anonymous"></audio>
-  <script src="app.js?v=corecap9"></script>
+  <script src="app.js?v=atmosphere10"></script>
 </body>
 </html>
